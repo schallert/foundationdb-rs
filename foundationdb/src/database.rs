@@ -10,17 +10,17 @@
 //!
 //! https://apple.github.io/foundationdb/api-c.html#database
 
-use std;
-use std::sync::Arc;
+use std::{self, sync::Arc};
 
 use foundationdb_sys as fdb;
-use futures::future::*;
-use futures::Future;
+use futures::future::{poll_fn, ready, Future, TryFuture};
 
-use crate::cluster::*;
-use crate::error::{self, Error as FdbError, Result};
-use crate::options;
-use crate::transaction::*;
+use crate::{
+    cluster::*,
+    error::{self, Error as FdbError, Result},
+    options,
+    transaction::*,
+};
 
 /// Represents a FoundationDB database — a mutable, lexicographically ordered mapping from binary keys to binary values.
 ///
@@ -65,43 +65,29 @@ impl Database {
     /// It might retry indefinitely if the transaction is highly contentious. It is recommended to
     /// set `TransactionOption::RetryLimit` or `TransactionOption::SetTimeout` on the transaction
     /// if the task need to be guaranteed to finish.
-    pub fn transact<F, Fut, Item, Error>(
-        &self,
-        f: F,
-    ) -> Box<dyn Future<Item = Fut::Item, Error = Error>>
+    pub async fn transact<F, Fut, Item, Error>(&self, mut f: F) -> Fut::Output
     where
-        F: FnMut(Transaction) -> Fut + 'static,
-        Fut: IntoFuture<Item = Item, Error = Error> + 'static,
-        Item: 'static,
-        Error: From<FdbError> + 'static,
+        F: FnMut(Transaction) -> Fut,
+        Fut: Future<Output = std::result::Result<Item, Error>>,
+        // Item: 'static,
+        Error: From<FdbError>,
     {
         let db = self.clone();
-
-        let f = result(db.create_trx())
-            .map_err(Error::from)
-            .and_then(|trx| {
-                loop_fn((trx, f), |(trx, mut f)| {
-                    let trx0 = trx.clone();
-                    f(trx.clone()).into_future().and_then(move |res| {
-                        // try to commit the transaction
-                        trx0.commit().map(|_| res).then(|res| match res {
-                            Ok(v) => {
-                                // committed
-                                Ok(Loop::Break(v))
-                            }
-                            Err(e) => {
-                                if e.should_retry() {
-                                    Ok(Loop::Continue((trx, f)))
-                                } else {
-                                    Err(Error::from(e))
-                                }
-                            }
-                        })
-                    })
-                })
-            });
-
-        Box::new(f)
+        let trx = db.create_trx()?;
+        loop {
+            let trx = trx.clone();
+            let res = f(trx.clone()).await?;
+            match trx.commit().await {
+                Ok(_) => return Ok(res),
+                Err(e) => {
+                    if e.should_retry() {
+                        continue;
+                    } else {
+                        return Err(Error::from(e));
+                    }
+                }
+            }
+        }
     }
 }
 

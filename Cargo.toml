@@ -1,5 +1,5 @@
 [workspace]
-members = ["foundationdb", 
+members = ["foundationdb",
            "foundationdb-sys",
            "foundationdb-gen",
            "foundationdb-bench"]

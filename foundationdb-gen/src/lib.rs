@@ -1,14 +1,14 @@
-
 use xml;
 #[macro_use]
 extern crate failure;
 
 type Result<T> = std::result::Result<T, failure::Error>;
 
-use inflector::cases::classcase;
-use inflector::cases::screamingsnakecase;
-use xml::attribute::OwnedAttribute;
-use xml::reader::{EventReader, XmlEvent};
+use inflector::cases::{classcase, screamingsnakecase};
+use xml::{
+    attribute::OwnedAttribute,
+    reader::{EventReader, XmlEvent},
+};
 
 #[derive(Debug)]
 struct FdbScope {

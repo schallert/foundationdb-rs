@@ -34,12 +34,15 @@ foundationdb-gen = { version = "0.1.0", path = "../foundationdb-gen" }
 failure = "0.1"
 failure_derive = "0.1"
 foundationdb-sys = { version = "0.2.0", path = "../foundationdb-sys", default-features = false }
-futures = "0.1"
+futures-preview = { version = "0.3.0-alpha.17", features = ["compat", "nightly", "async-await"] }
+futures01 = { package = "futures", version = "0.1", optional = true }
 lazy_static = "1.0"
 byteorder = "1.2"
 log = "0.4"
 uuid = { version = "0.7", optional = true }
 rand = "0.7.0"
+tokio = "=0.2.0-alpha.2"
+tokio-sync = "=0.2.0-alpha.2"
 
 [dev-dependencies]
 rand = "0.7"

@@ -5,6 +5,8 @@
 // http://opensource.org/licenses/MIT>, at your option. This file may not be
 // copied, modified, or distributed except according to those terms.
 
+#![feature(async_await, async_closure)]
+
 use foundationdb;
 
 #[macro_use]
@@ -13,18 +15,18 @@ extern crate lazy_static;
 #[macro_use]
 extern crate failure;
 
-use foundationdb::*;
-use futures::future::*;
-
 mod common;
 
-#[test]
-fn test_transact_error() {
+#[tokio::test]
+async fn test_transact_error() -> Result<(), failure::Error> {
     common::setup_static();
-    let fut = Cluster::new(foundationdb::default_config_path())
-        .and_then(|cluster| cluster.create_database())
-        .map_err(failure::Error::from)
-        .and_then(|db| db.transact(|_trx| -> Result<(), failure::Error> { bail!("failed") }));
+    let db = common::create_db().await?;
 
-    assert!(fut.wait().is_err(), "should return error");
+    let res = db
+        .transact(async move |_| -> Result<(), failure::Error> { bail!("failed") })
+        .await;
+
+    assert!(res.is_err());
+
+    Ok(())
 }

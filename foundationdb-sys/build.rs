@@ -1,9 +1,6 @@
 extern crate bindgen;
 
-use std::env;
-use std::fs::File;
-use std::io::prelude::*;
-use std::path::PathBuf;
+use std::{env, fs::File, io::prelude::*, path::PathBuf};
 
 #[cfg(target_os = "linux")]
 const INCLUDE_PATH: &str = "-I/usr/include/foundationdb/";

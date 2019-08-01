@@ -14,27 +14,41 @@
 //!
 //! The Rust API Client has been implemented to use the Rust futures crate, and should work within that ecosystem (suchas Tokio). See Rust [futures](https://docs.rs/crate/futures/0.1.21) documentation.
 
-use std;
-use std::ops::Deref;
+use std::{self, ops::Deref};
 
 use foundationdb_sys as fdb;
-use futures;
-use futures::Async;
 
-use crate::error::{self, Error, Result};
+use std::{
+    collections::hash_map::DefaultHasher,
+    future::Future,
+    hash::Hasher,
+    mem::{self, ManuallyDrop},
+    pin::Pin,
+    sync::{
+        atomic::{AtomicBool, AtomicUsize, Ordering},
+        Arc, Once,
+    },
+    task::{self, Poll},
+};
+use tokio_sync::AtomicWaker;
+
+use crate::error::{self, Result};
 
 /// An opaque type that represents a Future in the FoundationDB C API.
 pub(crate) struct FdbFuture {
     f: Option<*mut fdb::FDBFuture>,
-    task: Option<Box<futures::task::Task>>,
+    waker: Arc<AtomicWaker>,
+    registered: bool,
 }
 
 impl FdbFuture {
     // `new` is marked as unsafe because it's lifetime is not well-defined.
     pub(crate) unsafe fn new(f: *mut fdb::FDBFuture) -> Self {
+        let aw = AtomicWaker::new();
         Self {
             f: Some(f),
-            task: None,
+            waker: Arc::new(aw),
+            registered: false,
         }
     }
 }
@@ -46,50 +60,55 @@ impl Drop for FdbFuture {
             // `fdb_future_cancel` explicitly.
             unsafe { fdb::fdb_future_destroy(f) }
         }
+        // self.waker.do_drop();
     }
 }
 
-impl futures::Future for FdbFuture {
-    type Item = FdbFutureResult;
-    type Error = Error;
+impl Future for FdbFuture {
+    type Output = error::Result<FdbFutureResult>;
 
-    fn poll(&mut self) -> std::result::Result<Async<Self::Item>, Self::Error> {
+    fn poll(self: Pin<&mut Self>, cx: &mut task::Context) -> Poll<Self::Output> {
         let f = self.f.expect("cannot poll after resolve");
+        let fut = self.get_mut();
 
-        if self.task.is_none() {
-            let task = futures::task::current();
-            let task = Box::new(task);
-            let task_ptr = task.as_ref() as *const _;
-            unsafe {
-                fdb::fdb_future_set_callback(f, Some(fdb_future_callback), task_ptr as *mut _);
-            }
-            self.task = Some(task);
-
-            return Ok(Async::NotReady);
-        }
+        fut.waker.register_by_ref(cx.waker());
 
         let ready = unsafe { fdb::fdb_future_is_ready(f) };
-        if ready == 0 {
-            return Ok(Async::NotReady);
+        if ready != 0 {
+            unsafe { error::eval(fdb::fdb_future_get_error(f))? };
+
+            // The result is taking ownership of fdb::FDBFuture
+            let g = FdbFutureResult::new(fut.f.take().unwrap());
+            // fut.waker.do_drop();
+            return Poll::Ready(Ok(g));
         }
 
-        unsafe { error::eval(fdb::fdb_future_get_error(f))? };
+        if !fut.registered {
+            // let waker_ptr = &fut.waker as *const _;
+            let w = fut.waker.clone();
+            let wp = Arc::into_raw(w);
 
-        // The result is taking ownership of fdb::FDBFuture
-        let g = FdbFutureResult::new(self.f.take().unwrap());
-        Ok(Async::Ready(g))
+            unsafe {
+                let ret = fdb::fdb_future_set_callback(f, Some(fdb_future_callback), wp as *mut _);
+                debug_assert!(ret == 0);
+            }
+            fut.registered = true;
+        }
+
+        return Poll::Pending;
     }
 }
 
 // The callback from fdb C API can be called from multiple threads. so this callback should be
 // thread-safe.
+#[no_mangle]
 extern "C" fn fdb_future_callback(
     _f: *mut fdb::FDBFuture,
     callback_parameter: *mut ::std::os::raw::c_void,
 ) {
-    let task: *const futures::task::Task = callback_parameter as *const _;
-    let task: &futures::task::Task = unsafe { &*task };
-    task.notify();
+    let waker_ptr: *const AtomicWaker = callback_parameter as *const _;
+    let waker = unsafe { Arc::from_raw(waker_ptr) };
+    waker.wake();
 }
 
 /// Represents the output of fdb_future_get_keyvalue_array().

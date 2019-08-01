@@ -27,16 +27,19 @@
 use std::sync::Mutex;
 
 use byteorder::ByteOrder;
-use futures::future::Future;
-use futures::stream::Stream;
+use futures::future::ready;
+
+use futures::TryStreamExt;
 use rand::Rng;
 
-use crate::error::Error;
-use crate::keyselector::KeySelector;
-use crate::options::{ConflictRangeType, MutationType, TransactionOption};
-use crate::subspace::Subspace;
-use crate::transaction::{RangeOptionBuilder, Transaction};
-use crate::tuple::Element;
+use crate::{
+    error::Error,
+    keyselector::KeySelector,
+    options::{ConflictRangeType, MutationType, TransactionOption},
+    subspace::Subspace,
+    transaction::{RangeOptionBuilder, Transaction},
+    tuple::Element,
+};
 
 const ONE_BYTES: &[u8] = &[0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00];
 
@@ -62,7 +65,7 @@ impl HighContentionAllocator {
     /// Returns a byte string that
     ///   1) has never and will never be returned by another call to this method on the same subspace
     ///   2) is nearly as short as possible given the above
-    pub fn allocate(&self, transaction: &mut Transaction) -> Result<i64, Error> {
+    pub async fn allocate(&self, transaction: &mut Transaction) -> Result<i64, Error> {
         let (begin, end) = self.counters.range();
 
         loop {
@@ -74,21 +77,18 @@ impl HighContentionAllocator {
                 .snapshot(true)
                 .build();
 
-            let kvs: Vec<i64> = transaction
+            let kvs = transaction
                 .get_ranges(range_option)
-                .map_err(|(_, e)| e)
-                .fold(Vec::new(), move |mut out, range_result| {
+                .try_fold(Vec::new(), |mut out, range_result| {
                     let kvs = range_result.key_values();
-
                     for kv in kvs.as_ref() {
-                        if let Element::I64(counter) = self.counters.unpack(kv.key())? {
+                        if let Ok(Element::I64(counter)) = self.counters.unpack(kv.key()) {
                             out.push(counter);
                         }
                     }
-
-                    Ok::<_, Error>(out)
+                    ready(Ok(out))
                 })
-                .wait()?;
+                .await?;
 
             let mut start: i64 = 0;
             let mut window: i64;
@@ -121,7 +121,7 @@ impl HighContentionAllocator {
 
                 let subspace_start_trx = transaction
                     .get(counters_subspace_with_start.bytes(), true)
-                    .wait()?;
+                    .await?;
                 let count = byteorder::LittleEndian::read_i64(subspace_start_trx.value().unwrap());
 
                 drop(mutex_guard);
@@ -157,21 +157,18 @@ impl HighContentionAllocator {
                     .snapshot(true)
                     .build();
 
-                let kvs: Vec<i64> = transaction
+                let kvs = transaction
                     .get_ranges(range_option)
-                    .map_err(|(_, e)| e)
-                    .fold(Vec::new(), move |mut out, range_result| {
+                    .try_fold(Vec::new(), |mut out, range_result| {
                         let kvs = range_result.key_values();
-
                         for kv in kvs.as_ref() {
-                            if let Element::I64(counter) = self.counters.unpack(kv.key())? {
+                            if let Ok(Element::I64(counter)) = self.counters.unpack(kv.key()) {
                                 out.push(counter);
                             }
                         }
-
-                        Ok::<_, Error>(out)
+                        ready(Ok(out))
                     })
-                    .wait()?;
+                    .await?;
 
                 let candidate_value_trx = transaction.get(candidate_subspace, false);
 
@@ -188,7 +185,7 @@ impl HighContentionAllocator {
                     }
                 }
 
-                let candidate_value = candidate_value_trx.wait()?;
+                let candidate_value = candidate_value_trx.await?;
 
                 match candidate_value.value() {
                     Some(_) => (),

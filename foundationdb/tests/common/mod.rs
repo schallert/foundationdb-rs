@@ -8,8 +8,7 @@ use foundationdb::*;
 /// string as a value.
 #[allow(unused)]
 pub fn random_str(len: usize) -> String {
-    use self::rand::distributions::Alphanumeric;
-    use self::rand::Rng;
+    use self::rand::{distributions::Alphanumeric, Rng};
 
     let mut rng = rand::thread_rng();
     ::std::iter::repeat(())
@@ -21,6 +20,14 @@ pub fn random_str(len: usize) -> String {
 #[allow(unused)]
 pub fn setup_static() {
     let _env = &*ENV;
+}
+
+#[allow(unused)]
+pub async fn create_db() -> error::Result<Database> {
+    let db = Cluster::new(foundationdb::default_config_path())
+        .await
+        .expect("expected new cluster");
+    db.create_database().await
 }
 
 lazy_static! {

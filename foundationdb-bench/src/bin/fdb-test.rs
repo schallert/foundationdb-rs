@@ -1,7 +1,10 @@
 #![feature(async_await)]
 
+extern crate foundationdb as fdb;
+
+#[macro_use]
+extern crate log;
 use env_logger;
-use log::info;
 use structopt;
 
 use std::sync::{atomic::*, Arc};
@@ -13,7 +16,7 @@ use structopt::StructOpt;
 
 use tokio::{prelude::*, runtime::Builder};
 
-use foundationdb::{self as fdb, error::*, *};
+use crate::fdb::{error::*, *};
 
 #[derive(Clone)]
 struct Counter {
@@ -84,6 +87,29 @@ impl BenchRunner {
             }
         }
     }
+
+    // fn step(mut self) -> Box<dyn Future<Item = Loop<(), Self>, Error = Error>> {
+    //     let trx = self.trx.take().unwrap();
+
+    //     for _ in 0..self.trx_batch_size {
+    //         self.rng.fill_bytes(&mut self.key_buf);
+    //         self.rng.fill_bytes(&mut self.val_buf);
+    //         self.key_buf[0] = 0x01;
+    //         trx.set(&self.key_buf, &self.val_buf);
+    //     }
+
+    //     let f = trx.commit().map(move |trx| {
+    //         trx.reset();
+    //         self.trx = Some(trx);
+
+    //         if self.counter.decr(self.trx_batch_size) {
+    //             Loop::Continue(self)
+    //         } else {
+    //             Loop::Break(())
+    //         }
+    //     });
+    //     Box::new(f)
+    // }
 }
 
 #[derive(Clone)]
@@ -97,19 +123,32 @@ impl Bench {
         let opt = &self.opt;
         let counter = Counter::new(opt.count);
 
+        let mut handles = Vec::new();
+
         let sw = Stopwatch::start_new();
 
         let step = (opt.queue_depth + opt.threads - 1) / opt.threads;
+        let mut start = 0;
+        for _ in 0..opt.threads {
+            let end = std::cmp::min(start + step, opt.queue_depth);
 
-        let start = 0;
-        let end = std::cmp::min(start + step, opt.queue_depth);
-        let range = start..end;
-        let counter = counter.clone();
-        let b = self.clone();
+            let range = start..end;
+            let counter = counter.clone();
+            let b = self.clone();
+            // let handle = std::thread::spawn(move || b.run_range(range, counter).await);
+            // let handle =
+            //     spawn(
+            //         async move { poll_fn(move |_| blocking(|| b.run_range(range, counter))).await },
+            //     );
+            let handle = async move { b.run_range(range, counter).await };
+            handles.push(handle);
 
-        b.run_range(range, counter)
-            .await
-            .expect("error running range");
+            start = end;
+        }
+
+        for handle in handles {
+            handle.await.expect("failed to run bench");
+        }
 
         let elapsed = sw.elapsed_ms() as usize;
 
@@ -164,7 +203,6 @@ fn main() {
     info!("opt: {:?}", opt);
 
     let rt = Builder::new()
-        .core_threads(opt.threads)
         .build()
         .expect("failed to build tokio runtime");
 
@@ -186,13 +224,40 @@ fn main() {
             .await
             .expect("failed to create cluster");
 
-        let db = cluster
-            .create_database()
-            .await
-            .expect("failed to get database");
+        let db = Arc::new(
+            cluster
+                .create_database()
+                .await
+                .expect("failed to get database"),
+        );
 
-        let bench = Bench { db, opt };
-        bench.run().await;
+        // {
+        //     let trx = db.create_trx().unwrap();
+        //     let begin = keyselector::KeySelector::first_greater_or_equal(b"\x00");
+        //     let end = keyselector::KeySelector::first_greater_or_equal(b"\xff");
+        //     let range = RangeOptionBuilder::new(begin, end).build();
+        //     let res = trx.get_range(range, 100).await.unwrap();
+
+        //     while let Some(kv) = res.next() {
+        //         println!("{:?}", kv);
+        //     }
+        // }
+        // return;
+
+        let mut handles = Vec::new();
+        for i in 0..opt.count {
+            let s = format!("foo-{}", i);
+            let db = db.clone();
+            handles.push(async move {
+                let s = s.as_bytes();
+                let trx = db.create_trx().unwrap();
+                trx.set(s, s);
+                trx.commit().await.unwrap();
+            });
+        }
+
+        join_all(handles).await;
+        println!("put foo at bar");
     });
 
     network.stop().expect("failed to stop network");

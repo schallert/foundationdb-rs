@@ -10,16 +10,20 @@
 //!
 //! see https://apple.github.io/foundationdb/api-c.html#network
 
-use std;
-use std::sync::atomic::{AtomicBool, Ordering};
-use std::thread;
+use std::{
+    self,
+    sync::atomic::{AtomicBool, Ordering},
+    thread,
+};
 
 use failure;
 
-use crate::error::{self, Result};
-use crate::fdb_api::FdbApi;
+use crate::{
+    error::{self, Result},
+    fdb_api::FdbApi,
+    options::NetworkOption,
+};
 use foundationdb_sys as fdb_sys;
-use crate::options::NetworkOption;
 
 // The Fdb states that setting the Client version should happen only once
 //   and is not thread-safe, thus the choice of a lazy static enforcing a single
@@ -132,8 +136,7 @@ impl From<FdbApi> for NetworkBuilder {
 
 #[cfg(test)]
 mod tests {
-    use std::sync::Arc;
-    use std::thread;
+    use std::{sync::Arc, thread};
 
     use crate::fdb_api::*;
 

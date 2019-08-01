@@ -1,9 +1,6 @@
 extern crate foundationdb_gen;
 
-use std::env;
-use std::fs::File;
-use std::io::prelude::*;
-use std::path::PathBuf;
+use std::{env, fs::File, io::prelude::*, path::PathBuf};
 
 fn main() {
     let out_path = PathBuf::from(env::var("OUT_DIR").expect("OUT_DIR is undefined!"));

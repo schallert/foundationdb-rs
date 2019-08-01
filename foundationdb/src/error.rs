@@ -8,15 +8,16 @@
 
 //! Error types for the Fdb crate
 
-use std;
-use std::ffi::CStr;
-use std::fmt::{self, Display};
+use std::{
+    self,
+    ffi::CStr,
+    fmt::{self, Display},
+};
 
 use failure::{Backtrace, Context, Fail};
 
+use crate::{options, tuple};
 use foundationdb_sys as fdb_sys;
-use crate::options;
-use crate::tuple;
 
 pub(crate) fn eval(error_code: fdb_sys::fdb_error_t) -> Result<()> {
     let rust_code = error_code as i32;
