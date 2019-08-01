@@ -62,7 +62,7 @@ impl FdbScope {
         for option in self.options.iter() {
             let rs_name = match option.name.as_ref() {
                 "AppendIfFit" => "AppendIfFits",
-                s => s
+                s => s,
             };
 
             s += &format!("{}::{}", self.name, rs_name);
@@ -352,7 +352,8 @@ const OPTIONS_DATA: &[u8] = include_bytes!("/usr/include/foundationdb/fdb.option
 const OPTIONS_DATA: &[u8] = include_bytes!("/usr/local/include/foundationdb/fdb.options");
 
 #[cfg(target_os = "windows")]
-const OPTIONS_DATA: &[u8] = include_bytes!("C:/Program Files/foundationdb/include/foundationdb/fdb.options");
+const OPTIONS_DATA: &[u8] =
+    include_bytes!("C:/Program Files/foundationdb/include/foundationdb/fdb.options");
 
 pub fn emit() -> Result<String> {
     let mut reader = OPTIONS_DATA.as_ref();
@@ -387,7 +388,7 @@ pub fn emit() -> Result<String> {
 
     let mut result = format!(
         "{}\n{}\n{}\n\n",
-        "use std;", "use error;", "use foundationdb_sys as fdb;"
+        "use std;", "use crate::error;", "use foundationdb_sys as fdb;"
     );
 
     for scope in scopes.iter() {
