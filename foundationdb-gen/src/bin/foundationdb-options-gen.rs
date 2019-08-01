@@ -1,4 +1,4 @@
-extern crate foundationdb_gen;
+use foundationdb_gen;
 
 fn main() {
     let code = foundationdb_gen::emit().expect("couldn't generate options.rs code!");

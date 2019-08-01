@@ -1,11 +1,11 @@
 extern crate foundationdb as fdb;
-extern crate futures;
-extern crate rand;
-extern crate stopwatch;
+
+
+
 #[macro_use]
 extern crate log;
-extern crate env_logger;
-extern crate structopt;
+use env_logger;
+use structopt;
 
 use std::sync::atomic::*;
 use std::sync::Arc;

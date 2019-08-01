@@ -5,9 +5,9 @@
 // http://opensource.org/licenses/MIT>, at your option. This file may not be
 // copied, modified, or distributed except according to those terms.
 
-extern crate byteorder;
-extern crate foundationdb;
-extern crate futures;
+use byteorder;
+use foundationdb;
+
 #[macro_use]
 extern crate lazy_static;
 

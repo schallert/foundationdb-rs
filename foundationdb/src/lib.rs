@@ -114,13 +114,13 @@
 extern crate failure;
 #[macro_use]
 extern crate failure_derive;
-extern crate byteorder;
-extern crate foundationdb_sys;
+
+
 #[macro_use]
 extern crate futures;
-extern crate core;
-extern crate lazy_static;
-extern crate rand;
+
+
+
 #[cfg(feature = "uuid")]
 extern crate uuid;
 

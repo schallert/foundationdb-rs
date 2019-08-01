@@ -10,9 +10,9 @@
 extern crate lazy_static;
 #[macro_use]
 extern crate failure;
-extern crate foundationdb;
-extern crate futures;
-extern crate rand;
+use foundationdb;
+
+use rand;
 
 use std::borrow::Cow;
 use std::thread;

@@ -1,5 +1,5 @@
-extern crate inflector;
-extern crate xml;
+
+use xml;
 #[macro_use]
 extern crate failure;
 

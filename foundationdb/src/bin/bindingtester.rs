@@ -1,6 +1,6 @@
 extern crate foundationdb as fdb;
 extern crate foundationdb_sys as fdb_sys;
-extern crate futures;
+
 #[macro_use]
 extern crate log;
 
@@ -55,7 +55,7 @@ struct Instr {
 }
 
 impl std::fmt::Debug for Instr {
-    fn fmt(&self, fmt: &mut std::fmt::Formatter) -> std::fmt::Result {
+    fn fmt(&self, fmt: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(fmt, "[{:?}", self.code)?;
         if self.database {
             write!(fmt, " db")?;
@@ -293,7 +293,7 @@ impl StackItem {
 }
 
 impl std::fmt::Debug for StackItem {
-    fn fmt(&self, fmt: &mut std::fmt::Formatter) -> std::fmt::Result {
+    fn fmt(&self, fmt: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(fmt, "[item num={}, data={:?}]", self.number, self.data)
     }
 }

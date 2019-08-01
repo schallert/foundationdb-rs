@@ -252,7 +252,7 @@ impl FdbFutureResult {
         let out_len = out_len as usize;
         let out_keyvalues: &[fdb::keyvalue] =
             unsafe { std::slice::from_raw_parts(out_keyvalues, out_len) };
-        let out_keyvalues: &[KeyValue] = unsafe { std::mem::transmute(out_keyvalues) };
+        let out_keyvalues: &[KeyValue<'_>] = unsafe { std::mem::transmute(out_keyvalues) };
         Ok(KeyValues {
             keyvalues: out_keyvalues,
             more: (more != 0),
@@ -272,6 +272,6 @@ impl FdbFutureResult {
 fn test_keyvalue_size() {
     unsafe {
         // compile-time test for struct size
-        std::mem::transmute::<KeyValue, fdb::keyvalue>(std::mem::uninitialized());
+        std::mem::transmute::<KeyValue<'_>, fdb::keyvalue>(std::mem::uninitialized());
     }
 }

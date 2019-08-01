@@ -1,5 +1,5 @@
-extern crate rand;
-extern crate std;
+use rand;
+use std;
 
 use foundationdb::*;
 

@@ -708,7 +708,7 @@ impl GetRangeResult {
     }
 
     /// Returns the values associated with this get
-    pub fn key_values(&self) -> KeyValues {
+    pub fn key_values(&self) -> KeyValues<'_> {
         self.inner
             .get_keyvalue_array()
             .expect("inner should resolve into keyvalue array")
