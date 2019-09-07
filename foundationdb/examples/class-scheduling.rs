@@ -12,7 +12,6 @@
 extern crate lazy_static;
 #[macro_use]
 extern crate failure;
-use foundationdb;
 
 use rand;
 
@@ -20,15 +19,14 @@ use std::{borrow::Cow, thread};
 
 use self::rand::{rngs::ThreadRng, seq::SliceRandom};
 
-use foundationdb as fdb;
 use foundationdb::{
+    self as fdb,
     error::Result as FdbResult,
     transaction::RangeOptionBuilder,
     tuple::{Decode, Encode},
     Cluster, Database, Subspace, Transaction,
 };
-
-use tokio::prelude::*;
+use futures::future::join_all;
 
 // Data model:
 // ("attends", student, class) = ""
@@ -144,7 +142,7 @@ async fn ditch(db: &Database, student: String, class: String) -> Result<(), fail
     let student = &student.clone();
     let class = &class.clone();
     db.transact(async move |trx| {
-        ditch_trx(&trx, student, class);
+        ditch_trx(&trx, student, class).await;
         Ok::<(), failure::Error>(())
     })
     .await?;
@@ -317,21 +315,22 @@ async fn simulate_students(student_id: usize, num_ops: usize) {
 }
 
 async fn run_sim(db: &Database, students: usize, ops_per_student: usize) {
-    let mut threads: Vec<(usize, thread::JoinHandle<()>)> = Vec::with_capacity(students);
+    let mut futs = Vec::with_capacity(students);
+
+    // let mut threads: Vec<(usize, thread::JoinHandle<()>)> = Vec::with_capacity(students);
     for i in 0..students {
         // TODO: ClusterInner has a mutable pointer reference, if thread-safe, mark that trait as Sync, then we can clone DB here...
-        threads.push((
-            i,
-            thread::spawn(move || {
-                simulate_students(i, ops_per_student);
-            }),
-        ));
+        // threads.push((
+        //     i,
+        //     thread::spawn(move || {
+        //         simulate_students(i, ops_per_student);
+        //     }),
+        // ));
+        futs.push(simulate_students(i, ops_per_student));
     }
 
     // explicitly join...
-    for (id, thread) in threads {
-        thread.join().expect("failed to join thread");
-
+    for (id, _) in join_all(futs).await.iter().enumerate() {
         let student_id = format!("s{}", id);
         let attends_range = RangeOptionBuilder::from(("attends", &student_id)).build();
 
@@ -373,7 +372,7 @@ async fn main() {
         .expect("expected new cluster");
     let db = db.create_database().await.expect("expected DB");
 
-    init(&db, &*ALL_CLASSES);
+    init(&db, &*ALL_CLASSES).await;
     println!("Initialized");
     run_sim(&db, 10, 10).await;
 

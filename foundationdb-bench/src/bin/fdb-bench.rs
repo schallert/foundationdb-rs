@@ -11,7 +11,7 @@ use rand::{prelude::*, rngs::mock::StepRng};
 use stopwatch::Stopwatch;
 use structopt::StructOpt;
 
-use tokio::{prelude::*, runtime::Builder};
+use tokio::runtime::Builder;
 
 use foundationdb::{self as fdb, error::*, *};
 

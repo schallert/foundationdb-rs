@@ -14,7 +14,7 @@ use crate::fdb::{
     *,
 };
 use futures::{future::*, prelude::*};
-use tokio::{prelude::*, runtime::Runtime};
+use tokio::runtime::Runtime;
 
 use crate::fdb::options::{MutationType, StreamingMode};
 fn mutation_from_str(s: &str) -> MutationType {

@@ -13,7 +13,7 @@
 use std::{self, sync::Arc};
 
 use foundationdb_sys as fdb;
-use futures::future::{poll_fn, ready, Future, TryFuture};
+use futures::future::Future;
 
 use crate::{
     cluster::*,

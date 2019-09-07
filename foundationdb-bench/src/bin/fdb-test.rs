@@ -7,145 +7,14 @@ extern crate log;
 use env_logger;
 use structopt;
 
-use std::sync::{atomic::*, Arc};
+use std::sync::Arc;
 
 use futures::future::*;
-use rand::{prelude::*, rngs::mock::StepRng};
-use stopwatch::Stopwatch;
 use structopt::StructOpt;
 
-use tokio::{prelude::*, runtime::Builder};
+use tokio::runtime::Builder;
 
-use crate::fdb::{error::*, *};
-
-#[derive(Clone)]
-struct Counter {
-    size: usize,
-    inner: Arc<AtomicUsize>,
-}
-impl Counter {
-    fn new(size: usize) -> Self {
-        Self {
-            size,
-            inner: Default::default(),
-        }
-    }
-
-    fn decr(&self, n: usize) -> bool {
-        let val = self.inner.fetch_add(n, Ordering::SeqCst);
-        val < self.size
-    }
-}
-
-struct BenchRunner {
-    #[allow(unused)]
-    db: Database,
-    counter: Counter,
-    key_buf: Vec<u8>,
-    val_buf: Vec<u8>,
-    rng: StepRng,
-    trx: Option<Transaction>,
-    trx_batch_size: usize,
-}
-
-impl BenchRunner {
-    fn new(db: Database, rng: StepRng, counter: Counter, opt: &Opt) -> Self {
-        let mut key_buf = Vec::with_capacity(opt.key_len);
-        key_buf.resize(opt.key_len, 0u8);
-
-        let mut val_buf = Vec::with_capacity(opt.val_len);
-        val_buf.resize(opt.val_len, 0u8);
-
-        let trx = db.create_trx().expect("failed to create trx");
-
-        Self {
-            db,
-            counter,
-            key_buf,
-            val_buf,
-
-            rng,
-            trx: Some(trx),
-            trx_batch_size: opt.trx_batch_size,
-        }
-    }
-
-    async fn run(mut self) -> Result<()> {
-        let mut trx = self.trx.take().unwrap();
-        loop {
-            for _ in 0..self.trx_batch_size {
-                self.rng.fill_bytes(&mut self.key_buf);
-                self.rng.fill_bytes(&mut self.val_buf);
-                self.key_buf[0] = 0x01;
-                trx.set(&self.key_buf, &self.val_buf);
-            }
-
-            trx = trx.commit().await?;
-            trx.reset();
-            if !self.counter.decr(self.trx_batch_size) {
-                return Ok(());
-            }
-        }
-    }
-}
-
-#[derive(Clone)]
-struct Bench {
-    db: Database,
-    opt: Opt,
-}
-
-impl Bench {
-    async fn run(self) {
-        let opt = &self.opt;
-        let counter = Counter::new(opt.count);
-
-        let mut handles = Vec::new();
-
-        let sw = Stopwatch::start_new();
-
-        let step = (opt.queue_depth + opt.threads - 1) / opt.threads;
-        let mut start = 0;
-        for _ in 0..opt.threads {
-            let end = std::cmp::min(start + step, opt.queue_depth);
-
-            let range = start..end;
-            let counter = counter.clone();
-            let b = self.clone();
-            let handle = async move { b.run_range(range, counter).await };
-            handles.push(handle);
-
-            start = end;
-        }
-
-        for handle in handles {
-            handle.await.expect("failed to run bench");
-        }
-
-        let elapsed = sw.elapsed_ms() as usize;
-
-        info!(
-            "bench took: {:?} ms, {:?} tps",
-            elapsed,
-            1000 * opt.count / elapsed
-        );
-    }
-
-    async fn run_range(&self, r: std::ops::Range<usize>, counter: Counter) -> Result<()> {
-        let runners = r
-            .into_iter()
-            .map(|n| {
-                // With deterministic Rng, benchmark with same parameters will overwrite same set
-                // of keys again, which makes benchmark result stable.
-                let rng = StepRng::new(n as u64, 1);
-                BenchRunner::new(self.db.clone(), rng, counter.clone(), &self.opt).run()
-            })
-            .collect::<Vec<_>>();
-
-        join_all(runners).await;
-        Ok(())
-    }
-}
+use crate::fdb::*;
 
 #[derive(StructOpt, Debug, Clone)]
 #[structopt(name = "fdb-bench")]

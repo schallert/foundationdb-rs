@@ -17,8 +17,6 @@ use futures::future::*;
 
 mod common;
 
-use tokio::prelude::*;
-
 #[tokio::test]
 async fn test_set_get() -> error::Result<()> {
     common::setup_static();

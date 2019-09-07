@@ -7,8 +7,6 @@
 
 #![feature(async_await, async_closure)]
 
-use foundationdb;
-
 #[macro_use]
 extern crate lazy_static;
 

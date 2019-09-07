@@ -14,20 +14,14 @@
 //!
 //! The Rust API Client has been implemented to use the Rust futures crate, and should work within that ecosystem (suchas Tokio). See Rust [futures](https://docs.rs/crate/futures/0.1.21) documentation.
 
-use std::{self, ops::Deref};
-
 use foundationdb_sys as fdb;
 
 use std::{
-    collections::hash_map::DefaultHasher,
+    self,
     future::Future,
-    hash::Hasher,
-    mem::{self, ManuallyDrop},
+    ops::Deref,
     pin::Pin,
-    sync::{
-        atomic::{AtomicBool, AtomicUsize, Ordering},
-        Arc, Once,
-    },
+    sync::Arc,
     task::{self, Poll},
 };
 use tokio_sync::AtomicWaker;

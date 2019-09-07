@@ -24,7 +24,7 @@ async fn test_get_range() -> error::Result<()> {
     common::setup_static();
     const N: usize = 10000;
 
-    let fut = Cluster::new(foundationdb::default_config_path());
+    Cluster::new(foundationdb::default_config_path()).await?;
     let db = common::create_db().await?;
     let trx = db.create_trx()?;
 

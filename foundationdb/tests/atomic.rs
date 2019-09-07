@@ -16,7 +16,6 @@ extern crate lazy_static;
 use byteorder::ByteOrder;
 use foundationdb::*;
 use futures::future::*;
-use tokio::prelude::*;
 
 mod common;
 
