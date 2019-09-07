@@ -121,6 +121,7 @@ impl Bench {
     }
 
     async fn run_range(&self, r: std::ops::Range<usize>, counter: Counter) -> Result<()> {
+        println!("range: {:?}", r);
         let runners = r
             .into_iter()
             .map(|n| {

@@ -87,29 +87,6 @@ impl BenchRunner {
             }
         }
     }
-
-    // fn step(mut self) -> Box<dyn Future<Item = Loop<(), Self>, Error = Error>> {
-    //     let trx = self.trx.take().unwrap();
-
-    //     for _ in 0..self.trx_batch_size {
-    //         self.rng.fill_bytes(&mut self.key_buf);
-    //         self.rng.fill_bytes(&mut self.val_buf);
-    //         self.key_buf[0] = 0x01;
-    //         trx.set(&self.key_buf, &self.val_buf);
-    //     }
-
-    //     let f = trx.commit().map(move |trx| {
-    //         trx.reset();
-    //         self.trx = Some(trx);
-
-    //         if self.counter.decr(self.trx_batch_size) {
-    //             Loop::Continue(self)
-    //         } else {
-    //             Loop::Break(())
-    //         }
-    //     });
-    //     Box::new(f)
-    // }
 }
 
 #[derive(Clone)]
@@ -135,11 +112,6 @@ impl Bench {
             let range = start..end;
             let counter = counter.clone();
             let b = self.clone();
-            // let handle = std::thread::spawn(move || b.run_range(range, counter).await);
-            // let handle =
-            //     spawn(
-            //         async move { poll_fn(move |_| blocking(|| b.run_range(range, counter))).await },
-            //     );
             let handle = async move { b.run_range(range, counter).await };
             handles.push(handle);
 
@@ -230,19 +202,6 @@ fn main() {
                 .await
                 .expect("failed to get database"),
         );
-
-        // {
-        //     let trx = db.create_trx().unwrap();
-        //     let begin = keyselector::KeySelector::first_greater_or_equal(b"\x00");
-        //     let end = keyselector::KeySelector::first_greater_or_equal(b"\xff");
-        //     let range = RangeOptionBuilder::new(begin, end).build();
-        //     let res = trx.get_range(range, 100).await.unwrap();
-
-        //     while let Some(kv) = res.next() {
-        //         println!("{:?}", kv);
-        //     }
-        // }
-        // return;
 
         let mut handles = Vec::new();
         for i in 0..opt.count {
