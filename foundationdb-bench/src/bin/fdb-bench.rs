@@ -118,7 +118,6 @@ impl Bench {
     }
 
     async fn run_range(&self, r: std::ops::Range<usize>, counter: Counter) -> Result<()> {
-        println!("range: {:?}", r);
         let runners = r
             .map(|n| {
                 // With deterministic Rng, benchmark with same parameters will overwrite same set
