@@ -16,6 +16,7 @@
 
 use foundationdb_sys as fdb;
 
+use futures::task::AtomicWaker;
 use std::{
     self,
     future::Future,
@@ -24,7 +25,6 @@ use std::{
     sync::Arc,
     task::{self, Poll},
 };
-use tokio_sync::AtomicWaker;
 
 use crate::error::{self, Result};
 
@@ -54,7 +54,6 @@ impl Drop for FdbFuture {
             // `fdb_future_cancel` explicitly.
             unsafe { fdb::fdb_future_destroy(f) }
         }
-        // self.waker.do_drop();
     }
 }
 
@@ -65,7 +64,7 @@ impl Future for FdbFuture {
         let f = self.f.expect("cannot poll after resolve");
         let fut = self.get_mut();
 
-        fut.waker.register_by_ref(cx.waker());
+        fut.waker.register(cx.waker());
 
         let ready = unsafe { fdb::fdb_future_is_ready(f) };
         if ready != 0 {
@@ -73,12 +72,10 @@ impl Future for FdbFuture {
 
             // The result is taking ownership of fdb::FDBFuture
             let g = FdbFutureResult::new(fut.f.take().unwrap());
-            // fut.waker.do_drop();
             return Poll::Ready(Ok(g));
         }
 
         if !fut.registered {
-            // let waker_ptr = &fut.waker as *const _;
             let w = fut.waker.clone();
             let wp = Arc::into_raw(w);
 

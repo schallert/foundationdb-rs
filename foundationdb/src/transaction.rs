@@ -11,7 +11,7 @@
 //! https://apple.github.io/foundationdb/api-c.html#transaction
 
 use foundationdb_sys as fdb;
-use futures::{ready, Stream};
+use futures::{ready, FutureExt, Stream};
 use std::{
     self, fmt,
     future::Future,
@@ -661,15 +661,10 @@ pub struct TrxGet {
 impl Future for TrxGet {
     type Output = error::Result<GetResult>;
 
-    fn poll(self: Pin<&mut Self>, cx: &mut task::Context) -> Poll<Self::Output> {
-        match Pin::new(&mut self.get_mut().inner).poll(cx) {
-            Poll::Pending => Poll::Pending,
-            Poll::Ready(Err(e)) => Poll::Ready(Err(e)),
-            Poll::Ready(Ok((trx, inner))) => {
-                inner.get_value()?;
-                Poll::Ready(Ok(GetResult { trx, inner }))
-            }
-        }
+    fn poll(mut self: Pin<&mut Self>, cx: &mut task::Context) -> Poll<Self::Output> {
+        let (trx, inner) = ready!(self.inner.poll_unpin(cx))?;
+        inner.get_value()?;
+        Poll::Ready(Ok(GetResult { trx, inner }))
     }
 }
 
@@ -697,14 +692,10 @@ pub struct TrxGetKey {
 impl Future for TrxGetKey {
     type Output = Result<GetKeyResult>;
 
-    fn poll(self: Pin<&mut Self>, cx: &mut task::Context) -> Poll<Self::Output> {
-        // TODO(schallert): use the new futures "ready!" macro once this
-        // compiles.
-        match Pin::new(&mut self.get_mut().inner).poll(cx) {
-            Poll::Pending => Poll::Pending,
-            Poll::Ready(Err(e)) => Poll::Ready(Err(e)),
-            Poll::Ready(Ok((trx, inner))) => Poll::Ready(Ok(GetKeyResult { trx, inner })),
-        }
+    fn poll(mut self: Pin<&mut Self>, cx: &mut task::Context) -> Poll<Self::Output> {
+        let (trx, inner) = ready!(self.inner.poll_unpin(cx))?;
+        inner.get_key()?;
+        Poll::Ready(Ok(GetKeyResult { trx, inner }))
     }
 }
 
@@ -779,20 +770,11 @@ pub struct TrxGetRange {
 impl Future for TrxGetRange {
     type Output = Result<GetRangeResult>;
 
-    fn poll(self: Pin<&mut Self>, cx: &mut task::Context) -> Poll<Self::Output> {
-        let fut = self.get_mut();
-        match Pin::new(&mut fut.inner).poll(cx) {
-            Poll::Pending => Poll::Pending,
-            Poll::Ready(res) => match res {
-                Err(e) => Poll::Ready(Result::Err(e)),
-                Ok((trx, inner)) => {
-                    // tests if the future resolves to keyvalue array.
-                    inner.get_keyvalue_array()?;
-                    let opt = fut.opt.take().expect("should not poll after ready");
-                    Poll::Ready(Result::Ok(GetRangeResult { trx, inner, opt }))
-                }
-            },
-        }
+    fn poll(mut self: Pin<&mut Self>, cx: &mut task::Context) -> Poll<Self::Output> {
+        let (trx, inner) = ready!(self.inner.poll_unpin(cx))?;
+        inner.get_keyvalue_array()?;
+        let opt = self.opt.take().expect("should not poll after ready");
+        Poll::Ready(Ok(GetRangeResult { trx, inner, opt }))
     }
 }
 
@@ -827,7 +809,6 @@ impl From<(RangeOption, Error)> for error::Error {
 impl<'a> Stream for RangeStream {
     type Item = std::result::Result<GetRangeResult, (RangeOption, Error)>;
 
-    // fn poll(&mut self) -> std::result::Result<Async<Option<Self::Item>>, Self::Error> {
     fn poll_next(self: Pin<&mut Self>, cx: &mut task::Context) -> Poll<Option<Self::Item>> {
         if self.inner.is_none() {
             return Poll::Ready(None);
@@ -884,9 +865,8 @@ impl WatchFuture {
 impl Future for WatchFuture {
     type Output = Result<()>;
 
-    fn poll(self: Pin<&mut Self>, cx: &mut task::Context) -> Poll<Self::Output> {
-        let fut = self.get_mut();
-        ready!(Pin::new(&mut fut.inner).poll(cx))?;
+    fn poll(mut self: Pin<&mut Self>, cx: &mut task::Context) -> Poll<Self::Output> {
+        ready!(self.inner.poll_unpin(cx))?;
         Poll::Ready(Ok(()))
     }
 }
@@ -904,9 +884,8 @@ impl VersionstampFuture {
 impl Future for VersionstampFuture {
     type Output = Result<Versionstamp>;
 
-    fn poll(self: Pin<&mut Self>, cx: &mut task::Context) -> Poll<Self::Output> {
-        let fut = self.get_mut();
-        let res = ready!(Pin::new(&mut fut.inner).poll(cx))?;
+    fn poll(mut self: Pin<&mut Self>, cx: &mut task::Context) -> Poll<Self::Output> {
+        let res = ready!(self.inner.poll_unpin(cx))?;
         let key = res.get_key()?;
         let mut buf: [u8; 10] = Default::default();
         buf.copy_from_slice(key);
@@ -946,8 +925,8 @@ impl NonTrxFuture {
 impl Future for NonTrxFuture {
     type Output = Result<FdbFutureResult>;
 
-    fn poll(self: Pin<&mut Self>, cx: &mut task::Context) -> Poll<Self::Output> {
-        Pin::new(&mut self.get_mut().inner).poll(cx)
+    fn poll(mut self: Pin<&mut Self>, cx: &mut task::Context) -> Poll<Self::Output> {
+        self.inner.poll_unpin(cx)
     }
 }
 
@@ -972,14 +951,17 @@ impl TrxErrFuture {
 }
 
 impl Future for TrxErrFuture {
-    type Output = Result<Error>;
+    type Output = Error;
 
-    fn poll(self: Pin<&mut Self>, cx: &mut task::Context) -> Poll<Self::Output> {
-        let fut = self.get_mut();
-        ready!(Pin::new(&mut fut.inner).poll(cx))?;
-        let mut e = fut.err.take().expect("should not poll after ready");
-        e.set_should_retry(true);
-        Poll::Ready(Ok(e))
+    fn poll(mut self: Pin<&mut Self>, cx: &mut task::Context) -> Poll<Self::Output> {
+        match ready!(self.inner.poll_unpin(cx)) {
+            Ok(_) => {
+                let mut e = self.err.take().expect("should not poll after ready");
+                e.set_should_retry(true);
+                Poll::Ready(e)
+            }
+            Err(e) => Poll::Ready(e),
+        }
     }
 }
 
@@ -1006,14 +988,13 @@ impl TrxFuture {
 impl Future for TrxFuture {
     type Output = Result<(Transaction, FdbFutureResult)>;
 
-    fn poll(self: Pin<&mut Self>, cx: &mut task::Context) -> Poll<Self::Output> {
-        let mut fut = self.get_mut();
-        if fut.f_err.is_none() {
-            match Pin::new(&mut fut.inner).poll(cx) {
+    fn poll(mut self: Pin<&mut Self>, cx: &mut task::Context) -> Poll<Self::Output> {
+        if self.f_err.is_none() {
+            match self.inner.poll_unpin(cx) {
                 Poll::Pending => return Poll::Pending,
                 Poll::Ready(Ok(res)) => {
                     return Poll::Ready(Ok((
-                        fut.trx.take().expect("should not poll after ready"),
+                        self.trx.take().expect("should not poll after ready"),
                         res,
                     )));
                 }
@@ -1021,17 +1002,16 @@ impl Future for TrxFuture {
                     // The transaction will be dropped on `TrxErrFuture::new`. The `trx` is a last
                     // reference for the transaction, undering transaction will be destroyed at
                     // this point.
-                    let trx = fut.trx.take().expect("should not poll after error");
-                    fut.f_err = Some(TrxErrFuture::new(trx, e));
-                    return Pin::new(fut).poll(cx);
+                    let trx = self.trx.take().expect("should not poll after error");
+                    self.f_err = Some(TrxErrFuture::new(trx, e));
+                    return self.poll_unpin(cx);
                 }
             }
         }
 
-        match Pin::new(&mut fut.f_err.as_mut().unwrap()).poll(cx) {
+        match self.f_err.as_mut().unwrap().poll_unpin(cx) {
             Poll::Pending => Poll::Pending,
-            Poll::Ready(Ok(res)) => Poll::Ready(Err(res)),
-            Poll::Ready(Err(e)) => Poll::Ready(Err(e)),
+            Poll::Ready(e) => Poll::Ready(Err(e)),
         }
     }
 }

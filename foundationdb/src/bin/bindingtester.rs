@@ -506,7 +506,7 @@ impl StackMachine {
                 let code: i64 = self.pop_item().await;
                 let trx0 = trx.clone();
                 let f = async move {
-                    trx0.on_error(Error::from(code as i32)).await?;
+                    trx0.on_error(Error::from(code as i32)).await;
                     Ok((trx0, b"RESULT_NOT_PRESENT".to_vec()))
                 };
                 self.push_fut(number, f);

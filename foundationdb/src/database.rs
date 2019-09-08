@@ -69,7 +69,6 @@ impl Database {
     where
         F: FnMut(Transaction) -> Fut,
         Fut: Future<Output = std::result::Result<Item, Error>>,
-        // Item: 'static,
         Error: From<FdbError>,
     {
         let db = self.clone();
