@@ -91,8 +91,8 @@ async fn test_hca_concurrent_allocations() -> error::Result<()> {
     Ok(())
 }
 
-fn check_hca_result_uniqueness(results: &Vec<i64>) {
-    let result_set: HashSet<i64> = HashSet::from_iter(results.clone());
+fn check_hca_result_uniqueness(results: &[i64]) {
+    let result_set: HashSet<i64> = HashSet::from_iter(results.to_owned());
 
     if results.len() != result_set.len() {
         panic!(

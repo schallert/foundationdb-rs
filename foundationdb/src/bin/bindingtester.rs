@@ -440,6 +440,7 @@ impl StackMachine {
         self.stack.push(item);
     }
 
+    #[allow(clippy::cognitive_complexity)]
     async fn run_step(&mut self, number: usize, mut instr: Instr) {
         use crate::InstrCode::*;
 
@@ -817,10 +818,11 @@ fn main() {
     let args = std::env::args().collect::<Vec<_>>();
     let prefix = &args[1];
 
-    let mut cluster_path = fdb::default_config_path();
-    if args.len() > 3 {
-        cluster_path = &args[3];
-    }
+    let cluster_path = if args.len() > 3 {
+        &args[3]
+    } else {
+        fdb::default_config_path()
+    };
 
     let api_version = args[2].parse::<i32>().expect("failed to parse api version");
 

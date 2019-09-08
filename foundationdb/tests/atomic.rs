@@ -50,7 +50,6 @@ async fn test_atomic() -> error::Result<()> {
     // Run `n` add(1) operations in parallel
     let db0 = db.clone();
     let fut_add_list = (0..n)
-        .into_iter()
         .map(move |_| atomic_add(db0.clone(), KEY, 1))
         .collect::<Vec<_>>();
     let fut_add = join_all(fut_add_list);
@@ -58,7 +57,6 @@ async fn test_atomic() -> error::Result<()> {
     // Run `n` add(-1) operations in parallel
     let db0 = db.clone();
     let fut_sub_list = (0..n)
-        .into_iter()
         .map(move |_| atomic_add(db0.clone(), KEY, -1))
         .collect::<Vec<_>>();
     let fut_sub = join_all(fut_sub_list);

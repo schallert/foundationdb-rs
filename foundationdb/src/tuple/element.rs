@@ -23,6 +23,7 @@ const VERSIONSTAMP: u8 = 0x33;
 
 pub(super) const ESCAPE: u8 = 0xff;
 
+#[allow(clippy::identity_op)]
 const SIZE_LIMITS: &[u64] = &[
     0,
     (1 << (1 * 8)) - 1,
@@ -106,15 +107,16 @@ fn decode_bytes(buf: &[u8]) -> Result<(Vec<u8>, usize)> {
     Ok((out, offset + 1))
 }
 
+#[allow(clippy::nonminimal_bool)]
 fn adjust_float_bytes(b: &mut [u8], encode: bool) {
     if (encode && b[0] & 0x80 != 0x00) || (!encode && b[0] & 0x80 == 0x00) {
         // Negative numbers: flip all of the bytes.
         for byte in b.iter_mut() {
-            *byte = *byte ^ 0xff
+            *byte ^= 0xff
         }
     } else {
         // Positive number: flip just the sign bit.
-        b[0] = b[0] ^ 0x80
+        b[0] ^= 0x80
     }
 }
 
@@ -445,7 +447,7 @@ impl Decode for i64 {
                 return Err(Error::InvalidData);
             }
 
-            (&mut data[(8 - n)..8]).copy_from_slice(&buf[1..(n + 1)]);
+            (&mut data[(8 - n)..8]).copy_from_slice(&buf[1..=n]);
             let val = byteorder::BE::read_u64(&data);
             let max = i64::max_value() as u64;
             if val <= max {
@@ -460,7 +462,7 @@ impl Decode for i64 {
                 return Err(Error::InvalidData);
             }
 
-            (&mut data[(8 - n)..8]).copy_from_slice(&buf[1..(n + 1)]);
+            (&mut data[(8 - n)..8]).copy_from_slice(&buf[1..=n]);
             let shift = SIZE_LIMITS[n];
 
             let val = byteorder::BE::read_u64(&data);
@@ -625,7 +627,7 @@ mod tests {
         test_round_trip(10000i64, &[22, 39, 16]);
         test_round_trip(-100i64, &[19, 155]);
         test_round_trip(-10000i64, &[18, 216, 239]);
-        test_round_trip(-1000000i64, &[17, 240, 189, 191]);
+        test_round_trip(-1_000_000i64, &[17, 240, 189, 191]);
 
         // boundary condition
         test_round_trip(255i64, &[21, 255]);
@@ -668,7 +670,7 @@ mod tests {
     #[test]
     fn test_large_neg() {
         test_round_trip(
-            -8617230260136600747,
+            -8_617_230_260_136_600_747,
             &[0x0c, 0x88, 0x69, 0x72, 0xbc, 0x04, 0xcf, 0x9b, 0x54],
         );
     }

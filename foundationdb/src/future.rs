@@ -89,7 +89,7 @@ impl Future for FdbFuture {
             fut.registered = true;
         }
 
-        return Poll::Pending;
+        Poll::Pending
     }
 }
 
@@ -241,8 +241,8 @@ impl FdbFutureResult {
             unsafe { std::slice::from_raw_parts(out_strings, out_len) };
 
         let mut v = Vec::with_capacity(out_len);
-        for i in 0..out_len {
-            let cstr = unsafe { std::ffi::CStr::from_ptr(out_strings[i]) };
+        for s in out_strings.iter().take(out_len) {
+            let cstr = unsafe { std::ffi::CStr::from_ptr(*s) };
             v.push(cstr.to_bytes());
         }
         Ok(v)
@@ -265,7 +265,9 @@ impl FdbFutureResult {
         let out_len = out_len as usize;
         let out_keyvalues: &[fdb::keyvalue] =
             unsafe { std::slice::from_raw_parts(out_keyvalues, out_len) };
-        let out_keyvalues: &[KeyValue<'_>] = unsafe { std::mem::transmute(out_keyvalues) };
+        let out_keyvalues: &[KeyValue<'_>] = unsafe {
+            &*(out_keyvalues as *const [foundationdb_sys::keyvalue] as *const [KeyValue<'a>])
+        };
         Ok(KeyValues {
             keyvalues: out_keyvalues,
             more: (more != 0),

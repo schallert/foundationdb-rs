@@ -19,7 +19,7 @@ mod common;
 #[tokio::test]
 async fn test_watch() -> error::Result<()> {
     common::setup_static();
-    const KEY: &'static [u8] = b"test-watch";
+    const KEY: &[u8] = b"test-watch";
 
     let db = common::create_db().await?;
 
@@ -47,7 +47,7 @@ async fn test_watch() -> error::Result<()> {
 #[tokio::test]
 async fn test_watch_without_commit() -> error::Result<()> {
     common::setup_static();
-    const KEY: &'static [u8] = b"test-watch-2";
+    const KEY: &[u8] = b"test-watch-2";
 
     let db = common::create_db().await?;
     let trx = db.create_trx()?;

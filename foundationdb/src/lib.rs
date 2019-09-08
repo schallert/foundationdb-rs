@@ -134,7 +134,7 @@ pub mod hca;
 pub mod keyselector;
 pub mod network;
 /// Generated configuration types for use with the various `set_option` functions
-#[allow(missing_docs)]
+#[allow(missing_docs, clippy::all)]
 pub mod options;
 pub mod subspace;
 pub mod transaction;

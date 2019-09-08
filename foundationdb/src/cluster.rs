@@ -29,6 +29,7 @@ impl Cluster {
     /// * `path` - A string giving a local path of a cluster file (often called ‘fdb.cluster’) which contains connection information for the FoundationDB cluster. See `foundationdb::default_config_path()`
     ///
     /// TODO: implement Default for Cluster where: If cluster_file_path is NULL or an empty string, then a default cluster file will be used. see
+    #[allow(clippy::new_ret_no_self)]
     pub async fn new(path: &str) -> Result<Cluster> {
         let path_str = std::ffi::CString::new(path).unwrap();
         let fut = unsafe {
@@ -37,7 +38,7 @@ impl Cluster {
         };
         let result = fut.await?;
         let cluster = unsafe { result.get_cluster()? };
-        Ok(Cluster {
+        Ok(Self {
             inner: Arc::new(ClusterInner::new(cluster)),
         })
     }

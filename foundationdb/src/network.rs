@@ -50,7 +50,7 @@ impl Network {
     /// Unless your program is entirely event-driven based on results of asynchronous functions in this API and has no event loop of its own, you will want to invoke this function on an auxiliary thread (which it is your responsibility to create).
     ///
     /// This function will not return until `Network::stop` is called by you or a serious error occurs. You must not invoke `run` concurrently or reentrantly while it is already running.
-    pub fn run(&self) -> std::result::Result<(), failure::Error> {
+    pub fn run(self) -> std::result::Result<(), failure::Error> {
         if HAS_BEEN_RUN.compare_and_swap(false, true, Ordering::AcqRel) {
             return Err(format_err!("the network can only be run once per process"));
         }
@@ -64,7 +64,7 @@ impl Network {
     }
 
     /// Waits for run to have started
-    pub fn wait(&self) {
+    pub fn wait(self) {
         // TODO: rather than a hot loop, consider a condvar here...
         while !HAS_BEEN_RUN.load(Ordering::Acquire) {
             thread::yield_now();
@@ -98,7 +98,7 @@ impl Network {
     /// network.stop().expect("failed to stop network");
     /// handle.join().expect("failed to join fdb thread");
     /// ```
-    pub fn stop(&self) -> std::result::Result<(), failure::Error> {
+    pub fn stop(self) -> std::result::Result<(), failure::Error> {
         if !HAS_BEEN_RUN.load(Ordering::Acquire) {
             return Err(format_err!(
                 "the network must be runn before trying to stop"

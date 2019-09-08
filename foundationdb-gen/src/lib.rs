@@ -320,7 +320,7 @@ where
     I: Iterator<Item = xml::reader::Result<XmlEvent>>,
 {
     let mut options = Vec::new();
-    while let Some(e) = parser.next() {
+    for e in parser {
         let e = e?;
         match e {
             XmlEvent::StartElement {
@@ -356,7 +356,7 @@ const OPTIONS_DATA: &[u8] =
     include_bytes!("C:/Program Files/foundationdb/include/foundationdb/fdb.options");
 
 pub fn emit() -> Result<String> {
-    let mut reader = OPTIONS_DATA.as_ref();
+    let mut reader = OPTIONS_DATA;
     let parser = EventReader::new(&mut reader);
     let mut iter = parser.into_iter();
     let mut scopes = Vec::new();
@@ -392,8 +392,8 @@ pub fn emit() -> Result<String> {
     );
 
     for scope in scopes.iter() {
-        result.push_str(&format!("{}", scope.gen_ty()));
-        result.push_str(&format!("{}", scope.gen_impl()));
+        result.push_str(&scope.gen_ty().to_string());
+        result.push_str(&scope.gen_impl().to_string());
     }
 
     Ok(result)

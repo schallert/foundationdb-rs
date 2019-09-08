@@ -281,7 +281,7 @@ async fn simulate_students(student_id: usize, num_ops: usize) {
     for _ in 0..num_ops {
         let mut moods = Vec::<Mood>::new();
 
-        if my_classes.len() > 0 {
+        if !my_classes.is_empty() {
             moods.push(Mood::Ditch);
             moods.push(Mood::Switch);
         }
@@ -290,7 +290,7 @@ async fn simulate_students(student_id: usize, num_ops: usize) {
             moods.push(Mood::Add);
         }
 
-        let mood = moods.choose(&mut rng).map(|mood| *mood).unwrap();
+        let mood = moods.choose(&mut rng).copied().unwrap();
 
         // on errors we recheck for available classes
         if perform_op(
@@ -341,7 +341,7 @@ async fn run_sim(db: &Database, students: usize, ops_per_student: usize) {
             .await
             .expect("get_range failed")
             .key_values()
-            .into_iter()
+            .iter()
         {
             let (_, s, class) = <(String, String, String)>::try_from(key_value.key()).unwrap();
             assert_eq!(student_id, s);

@@ -47,11 +47,8 @@ struct BenchRunner {
 
 impl BenchRunner {
     fn new(db: Database, rng: StepRng, counter: Counter, opt: &Opt) -> Self {
-        let mut key_buf = Vec::with_capacity(opt.key_len);
-        key_buf.resize(opt.key_len, 0u8);
-
-        let mut val_buf = Vec::with_capacity(opt.val_len);
-        val_buf.resize(opt.val_len, 0u8);
+        let key_buf = vec![0; opt.key_len];
+        let val_buf = vec![0; opt.val_len];
 
         let trx = db.create_trx().expect("failed to create trx");
 
@@ -123,7 +120,6 @@ impl Bench {
     async fn run_range(&self, r: std::ops::Range<usize>, counter: Counter) -> Result<()> {
         println!("range: {:?}", r);
         let runners = r
-            .into_iter()
             .map(|n| {
                 // With deterministic Rng, benchmark with same parameters will overwrite same set
                 // of keys again, which makes benchmark result stable.
